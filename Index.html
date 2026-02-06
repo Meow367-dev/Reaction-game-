@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reaction Time</title>
+  <style>
+    :root { --bg: #0b0b0b; --fg: #ffffff; --muted:#bdbdbd; }
+    body {
+      margin: 0; height: 100vh; display: grid; place-items: center;
+      background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .card {
+      width: min(520px, 92vw);
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 18px;
+      background: rgba(255,255,255,.04);
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+      text-align: center;
+    }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    p { margin: 8px 0; color: var(--muted); }
+    .big {
+      margin: 14px 0 10px;
+      font-size: 44px; font-weight: 800; letter-spacing: -1px;
+    }
+    .btn {
+      width: 100%;
+      padding: 16px 18px;
+      border-radius: 14px;
+      border: none;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #1f1f1f;
+      color: white;
+    }
+    .btn:active { transform: scale(0.99); }
+    .hint { margin-top: 10px; font-size: 13px; color: var(--muted); }
+    .state {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.03);
+    }
+    .green { --bg: #063b16; }
+    .red   { --bg: #3b0606; }
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.16);
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1>Reaction Time</h1>
+    <p>Tap when the screen turns green. Don’t guess.</p>
+
+    <div class="big" id="score">—</div>
+
+    <button class="btn" id="btn">Start</button>
+
+    <div class="state" id="status">
+      <div id="statusText">Ready.</div>
+      <div class="pill" id="modePill">Mode: idle</div>
+    </div>
+
+    <div class="hint">Rules: random delay 1.5–6.5s • early tap = fail • under 100ms = invalid</div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('btn');
+    const score = document.getElementById('score');
+    const statusText = document.getElementById('statusText');
+    const modePill = document.getElementById('modePill');
+
+    let mode = 'idle'; // idle | waiting | go | done
+    let goTime = 0;
+    let timer = null;
+
+    function setMode(next) {
+      mode = next;
+      modePill.textContent = `Mode: ${mode}`;
+      document.body.classList.remove('green','red');
+      if (mode === 'go') document.body.classList.add('green');
+      if (mode === 'waiting') document.body.classList.add('red');
+    }
+
+    function randDelayMs() {
+      // 1.5s to 6.5s
+      return 1500 + Math.floor(Math.random() * 5000);
+    }
+
+    function reset() {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      goTime = 0;
+      setMode('idle');
+      score.textContent = '—';
+      statusText.textContent = 'Ready.';
+      btn.textContent = 'Start';
+    }
+
+    function start() {
+      if (timer) clearTimeout(timer);
+      setMode('waiting');
+      statusText.textContent = 'Wait for green...';
+      btn.textContent = 'Tap anywhere';
+      score.textContent = '—';
+
+      const delay = randDelayMs();
+      timer = setTimeout(() => {
+        setMode('go');
+        statusText.textContent = 'TAP NOW!';
+        goTime = performance.now();
+        timer = null;
+      }, delay);
+    }
+
+    function handleTap() {
+      if (mode === 'idle') {
+        start();
+        return;
+      }
+      if (mode === 'waiting') {
+        // early tap
+        if (timer) clearTimeout(timer);
+        timer = null;
+        setMode('done');
+        score.textContent = 'FAIL';
+        statusText.textContent = 'Too early 💀 (guessing = auto fail)';
+        btn.textContent = 'Try again';
+        return;
+      }
+      if (mode === 'go') {
+        const rt = performance.now() - goTime;
+        setMode('done');
+
+        // reaction floor
+        if (rt < 100) {
+          score.textContent = `${Math.round(rt)} ms`;
+          statusText.textContent = 'Invalid (<100ms). That’s anticipation/cheat.';
+        } else {
+          score.textContent = `${Math.round(rt)} ms`;
+          const target = 170;
+          if (rt <= target) {
+            statusText.textContent = `W 👑 You beat ${target}ms`;
+          } else {
+            statusText.textContent = `L 😭 Missed by ${Math.round(rt - target)}ms`;
+          }
+        }
+        btn.textContent = 'Run it back';
+        return;
+      }
+      if (mode === 'done') {
+        start();
+      }
+    }
+
+    // button + tap anywhere
+    btn.addEventListener('click', handleTap);
+    document.body.addEventListener('touchstart', (e) => { e.preventDefault(); handleTap(); }, { passive: false });
+    document.body.addEventListener('mousedown', handleTap);
+
+    reset();
+  </script>
+</body>
+</html>
